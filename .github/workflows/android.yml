@@ -45,7 +45,13 @@ jobs:
         env:
           KINO_KEYSTORE_PASSWORD: ${{ secrets.KINO_KEYSTORE_PASSWORD }}
           KINO_KEY_ALIAS: kino
-        run: gradle assembleRelease -PversionCode=${{ github.run_number }} --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          if ! gradle assembleRelease -PversionCode=${{ github.run_number }} --no-daemon 2>&1 | tee build.log; then
+            # Ошибки — в аннотации, чтобы их было видно без скачивания лога
+            grep -E "^e: |What went wrong|^> |error:|Could not|Unresolved|AAPT" build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+            exit 1
+          fi
       - name: Публикация в Releases
         env:
           GH_TOKEN: ${{ github.token }}
