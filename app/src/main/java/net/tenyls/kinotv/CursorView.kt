@@ -11,7 +11,7 @@ class CursorView(context: Context) : View(context) {
 
     var cx = 0f
     var cy = 0f
-    var pressed = false
+    var isDown = false
 
     private val d = resources.displayMetrics.density
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt(); style = Paint.Style.FILL }
@@ -28,7 +28,7 @@ class CursorView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val s = 1.6f * d
-        if (pressed) canvas.drawCircle(cx, cy, 14f * d, ring)
+        if (isDown) canvas.drawCircle(cx, cy, 14f * d, ring)
         val p = Path().apply {
             moveTo(cx, cy)
             lineTo(cx, cy + 17 * s)

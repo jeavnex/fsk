@@ -562,15 +562,15 @@ class MainActivity : Activity() {
                     if (!cursorVisible) { setCursorVisible(true); okLongFired = true; return true }
                     okDownTime = e.eventTime
                     okLongFired = false
-                    cursor.pressed = true; cursor.invalidate()
+                    cursor.isDown = true; cursor.invalidate()
                     sendTouch(MotionEvent.ACTION_DOWN)
                 } else if (down && !okLongFired && e.eventTime - okDownTime > 650) {
                     okLongFired = true
                     sendTouch(MotionEvent.ACTION_CANCEL)
-                    cursor.pressed = false; cursor.invalidate()
+                    cursor.isDown = false; cursor.invalidate()
                     showMenu()
                 } else if (up) {
-                    cursor.pressed = false; cursor.invalidate()
+                    cursor.isDown = false; cursor.invalidate()
                     if (!okLongFired) sendTouch(MotionEvent.ACTION_UP)
                     okLongFired = false
                     setCursorVisible(true)

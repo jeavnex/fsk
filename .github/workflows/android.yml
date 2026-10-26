@@ -49,7 +49,7 @@ jobs:
           set -o pipefail
           if ! gradle assembleRelease -PversionCode=${{ github.run_number }} --no-daemon 2>&1 | tee build.log; then
             # Ошибки — в аннотации, чтобы их было видно без скачивания лога
-            grep -E "^e: |error:|Could not|Unresolved|AAPT|FAILED|^  [A-Za-z]" build.log | grep -v "^> Task" | head -10 | while IFS= read -r l; do echo "::error::$l"; done
+            grep -E "^e: |error:|Could not|Unresolved|AAPT|FAILED|^  [A-Za-z]" build.log | grep -v "^> Task" | head -25 | while IFS= read -r l; do echo "::error::$l"; done
             exit 1
           fi
       - name: Публикация в Releases
