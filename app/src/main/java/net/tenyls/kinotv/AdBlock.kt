@@ -122,26 +122,40 @@ object AdBlock {
       e.preventDefault(); e.stopImmediatePropagation();
     }
   }, true);
+  var AD_NAME = /(^|[-_\s])(ad|ads|adv|advert|banner|promo|reklama|popup|teaser|branding)([-_\s]|$)/i;
+  function adName(el){ return AD_NAME.test((el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '')); }
   function sweep(){
     addCss();
     if (!document.body) return;
-    var vw = innerWidth, vh = innerHeight, kids = document.body.children;
-    for (var i = kids.length - 1; i >= 0; i--) {
-      var el = kids[i];
-      if (el.querySelector && el.querySelector('video')) continue;
+    var vw = innerWidth, vh = innerHeight;
+    var list = document.querySelectorAll('body > *, body > * > *, body > * > * > *');
+    for (var i = list.length - 1; i >= 0; i--) {
+      var el = list[i];
+      if (!el.isConnected || el.id === '__kino_css') continue;
       var cs = getComputedStyle(el);
-      if (cs.position !== 'fixed' && cs.position !== 'absolute') continue;
-      var z = parseInt(cs.zIndex) || 0; if (z < 999) continue;
+      if (cs.position !== 'fixed' && cs.position !== 'sticky' && !(cs.position === 'absolute' && (parseInt(cs.zIndex) || 0) >= 999)) continue;
+      if (el.querySelector('input,form,textarea,select') || el.closest('form')) continue;
       var r = el.getBoundingClientRect();
+      if (r.width < 30 || r.height < 30) continue;
+      var header = r.top <= 5 && r.width > vw * 0.9 && r.height < vh * 0.25;
+      if (header && !adName(el)) continue;
       var big = r.width > vw * 0.8 && r.height > vh * 0.8;
-      var invisible = parseFloat(cs.opacity) < 0.15 || (cs.backgroundColor === 'rgba(0, 0, 0, 0)' && !el.innerText.trim());
-      var extLink = (el.tagName === 'A' && ext(el.href)) || (el.querySelector && Array.prototype.some.call(el.querySelectorAll('a[href]'), function(a){ return ext(a.href); }));
-      var extFrame = el.querySelector && Array.prototype.some.call(el.querySelectorAll('iframe[src]'), function(f){ return ext(f.src) && f.getBoundingClientRect().width < vw * 0.6; });
-      if ((big && invisible) || (big && extLink && !el.querySelector('iframe')) || (extFrame && !big)) el.remove();
+      var hasVideo = !!el.querySelector('video');
+      var extLink = (el.tagName === 'A' && ext(el.href)) || Array.prototype.some.call(el.querySelectorAll('a[href]'), function(a){ return ext(a.href); });
+      var extFrame = Array.prototype.some.call(el.querySelectorAll('iframe[src]'), function(f){ return ext(f.src); });
+      var invisible = parseFloat(cs.opacity) < 0.15 || (cs.backgroundColor === 'rgba(0, 0, 0, 0)' && !(el.innerText || '').trim() && !el.querySelector('img,video,iframe'));
+      var txt = (el.innerText || '').slice(0, 300);
+      var pushy = /Перейти|Подробнее|Узнать|Казино|Бонус|Ставк|Знакомств|Напиши мне|Скачать/i.test(txt);
+      var adLike = adName(el) || hasVideo || extLink || extFrame || pushy;
+      if (big) { if (invisible || (extLink && !el.querySelector('iframe')) || (adName(el))) el.remove(); continue; }
+      if (adLike) el.remove();
     }
   }
+  var t = null;
+  try { new MutationObserver(function(){ if (t) return; t = setTimeout(function(){ t = null; sweep(); }, 150); })
+    .observe(document.documentElement, { childList: true, subtree: true }); } catch(e) {}
   sweep();
-  setInterval(sweep, 1500);
+  setInterval(sweep, 1000);
 })();
 """.trimIndent()
     }

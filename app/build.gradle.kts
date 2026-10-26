@@ -5,7 +5,6 @@ plugins {
 
 // Номер версии передаёт сборка на GitHub (номер запуска). Локально — 1.
 val vc = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
-val keystorePath: String? = System.getenv("KINO_KEYSTORE")
 
 android {
     namespace = "net.tenyls.kinotv"
@@ -20,13 +19,17 @@ android {
         buildConfigField("String", "REPO", "\"jeavnex/fsk\"")
     }
 
+    // Постоянный ключ подписи берётся из секретов репозитория (FSK_KEYSTORE_BASE64 / FSK_KEYSTORE_PASSWORD):
+    // тогда каждая новая версия ставится поверх старой, вход и настройки сохраняются.
+    val ksPath: String? = System.getenv("FSK_KEYSTORE")
     signingConfigs {
         create("release") {
-            if (keystorePath != null) {
-                storeFile = file(keystorePath)
-                storePassword = System.getenv("KINO_KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KINO_KEY_ALIAS") ?: "kino"
-                keyPassword = System.getenv("KINO_KEYSTORE_PASSWORD")
+            if (ksPath != null) {
+                storeFile = file(ksPath)
+                storeType = "pkcs12"
+                storePassword = System.getenv("FSK_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("FSK_KEY_ALIAS")
+                keyPassword = System.getenv("FSK_KEYSTORE_PASSWORD")
             }
         }
     }
@@ -34,8 +37,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = if (keystorePath != null) signingConfigs.getByName("release")
-            else signingConfigs.getByName("debug")
+            signingConfig = if (ksPath != null) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }
 

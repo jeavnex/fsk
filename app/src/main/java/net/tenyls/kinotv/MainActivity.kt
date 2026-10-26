@@ -473,10 +473,33 @@ class MainActivity : Activity() {
         val target = touchTarget()
         val now = SystemClock.uptimeMillis()
         if (action == MotionEvent.ACTION_DOWN) touchDownTime = now
-        val ev = MotionEvent.obtain(touchDownTime, now, action, cursor.cx - target.left, cursor.cy - target.top, 0)
-        ev.source = InputDevice.SOURCE_TOUCHSCREEN
+        val props = arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = MotionEvent.TOOL_TYPE_FINGER })
+        val coords = arrayOf(MotionEvent.PointerCoords().apply {
+            x = cursor.cx - target.left; y = cursor.cy - target.top; pressure = 1f; size = 1f
+        })
+        val ev = MotionEvent.obtain(touchDownTime, now, action, 1, props, coords, 0, 0, 1f, 1f, 0, 0,
+            InputDevice.SOURCE_TOUCHSCREEN, 0)
         target.dispatchTouchEvent(ev)
         ev.recycle()
+    }
+
+    private fun tapTouch() {
+        sendTouch(MotionEvent.ACTION_DOWN)
+        ui.postDelayed({ sendTouch(MotionEvent.ACTION_UP) }, 40)
+    }
+
+    /** Нажатие ОК: обычные ссылки и кнопки жмём через страницу (надёжно), плеер и поля ввода — касанием. */
+    private fun clickAtCursor() {
+        if (customView != null) { tapTouch(); return }
+        val fx = cursor.cx / max(1, web.width)
+        val fy = cursor.cy / max(1, web.height)
+        web.evaluateJavascript(
+            "(function(fx,fy){var el=document.elementFromPoint(fx*innerWidth,fy*innerHeight);if(!el)return 'none';" +
+                "var t=el.tagName;if(t==='IFRAME'||t==='VIDEO'||t==='INPUT'||t==='TEXTAREA'||t==='SELECT'||el.isContentEditable)return 'touch';" +
+                "var a=el.closest('a,button,[onclick],[role=button],label,summary')||el;" +
+                "['pointerdown','mousedown','pointerup','mouseup'].forEach(function(n){try{a.dispatchEvent(new MouseEvent(n,{bubbles:true,cancelable:true,view:window,clientX:fx*innerWidth,clientY:fy*innerHeight}))}catch(e){}});" +
+                "a.click();return 'ok';})($fx,$fy)"
+        ) { r -> if (r == null || !r.contains("ok")) tapTouch() }
     }
 
     private fun scrollPage(dx: Int, dy: Int) {
@@ -559,19 +582,17 @@ class MainActivity : Activity() {
             KeyEvent.KEYCODE_DPAD_DOWN -> { if (down) moveCursor(0, 1, e.repeatCount); return true }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A -> {
                 if (down && e.repeatCount == 0) {
-                    if (!cursorVisible) { setCursorVisible(true); okLongFired = true; return true }
                     okDownTime = e.eventTime
                     okLongFired = false
+                    setCursorVisible(true)
                     cursor.isDown = true; cursor.invalidate()
-                    sendTouch(MotionEvent.ACTION_DOWN)
-                } else if (down && !okLongFired && e.eventTime - okDownTime > 650) {
+                } else if (down && !okLongFired && e.eventTime - okDownTime > 700) {
                     okLongFired = true
-                    sendTouch(MotionEvent.ACTION_CANCEL)
                     cursor.isDown = false; cursor.invalidate()
                     showMenu()
                 } else if (up) {
                     cursor.isDown = false; cursor.invalidate()
-                    if (!okLongFired) sendTouch(MotionEvent.ACTION_UP)
+                    if (!okLongFired) clickAtCursor()
                     okLongFired = false
                     setCursorVisible(true)
                 }

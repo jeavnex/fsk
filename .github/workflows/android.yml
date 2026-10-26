@@ -31,20 +31,23 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14.3'
-      - name: Ключ подписи (постоянный — чтобы обновления ставились поверх)
+      - name: Ключ подписи (из секретов репозитория)
         env:
-          KS: ${{ secrets.KINO_KEYSTORE_BASE64 }}
+          KS: ${{ secrets.FSK_KEYSTORE_BASE64 }}
+          PW: ${{ secrets.FSK_KEYSTORE_PASSWORD }}
         run: |
           if [ -n "$KS" ]; then
-            echo "$KS" | base64 -d > "$RUNNER_TEMP/kino.jks"
-            echo "KINO_KEYSTORE=$RUNNER_TEMP/kino.jks" >> $GITHUB_ENV
+            echo "$KS" | tr -d ' \r\n' | base64 -d > "$RUNNER_TEMP/fsk.p12"
+            ALIAS=$(keytool -list -keystore "$RUNNER_TEMP/fsk.p12" -storetype PKCS12 -storepass "$PW" | grep -i PrivateKeyEntry | head -1 | cut -d, -f1)
+            echo "FSK_KEYSTORE=$RUNNER_TEMP/fsk.p12" >> $GITHUB_ENV
+            echo "FSK_KEY_ALIAS=$ALIAS" >> $GITHUB_ENV
+            echo "Постоянный ключ найден"
           else
-            echo "::warning::Секрет KINO_KEYSTORE_BASE64 не задан — APK будет подписан временным ключом"
+            echo "::warning::Секреты FSK_KEYSTORE_BASE64 / FSK_KEYSTORE_PASSWORD не заданы — APK подписан временным ключом"
           fi
       - name: Сборка
         env:
-          KINO_KEYSTORE_PASSWORD: ${{ secrets.KINO_KEYSTORE_PASSWORD }}
-          KINO_KEY_ALIAS: kino
+          FSK_KEYSTORE_PASSWORD: ${{ secrets.FSK_KEYSTORE_PASSWORD }}
         run: |
           set -o pipefail
           if ! gradle assembleRelease -PversionCode=${{ github.run_number }} --no-daemon 2>&1 | tee build.log; then
@@ -52,12 +55,13 @@ jobs:
             grep -E "^e: |error:|Could not|Unresolved|AAPT|FAILED|^  [A-Za-z]" build.log | grep -v "^> Task" | head -25 | while IFS= read -r l; do echo "::error::$l"; done
             exit 1
           fi
-      - name: Публикация в Releases
+      - name: Публикация в Releases (только с постоянным ключом)
+        if: env.FSK_KEYSTORE != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk KinoTV.apk
+          cp app/build/outputs/apk/release/app-release.apk FSK.apk
           MSG=$(git log -1 --format=%s)
-          gh release create "v${{ github.run_number }}" KinoTV.apk \
-            --title "Кино ТВ 1.${{ github.run_number }}" \
+          gh release create "v${{ github.run_number }}" FSK.apk \
+            --title "FSK 1.${{ github.run_number }}" \
             --notes "$MSG" --latest
